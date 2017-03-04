@@ -1,0 +1,110 @@
+Video_device struct is used for creating device node in /dev/*,the function is video_register_device.
+the types of video device are VFL_TYPE_GRABBER:/dev/videoX for video input/output devices.
+                              VFL_TYPE_BBI:/dev/vbiX
+                              VFL_TYPE_RADIO:/dev/radioX
+                              VFL_TYPE_SDR:/dev/swradioX
+                              VFL_TYPE_TOUCH:/dev/v4l-touchX for touch sensors.
+The function vide_device_alloc() is for allocate video_device object dynamically. 
+The v4l2_file_operations is the subset of the file_operations in video_device struct.
+Video device debugging, the log can be stored in /sys/class/video4linux/<devX> directory.
+Video_unregister_device() is for removing the device node which is created by video_reigster_device.
+Helper function, video_get_drvdata(vdev), video_set_drvdata(vdev), for set/get driver private data in the video_device struct.
+
+struct v4l2_device{
+  struct device * dev;
+#if defined(CONFIG_MEDIA_CONTROLLER)
+  struct media_device *mdev;
+#endif
+  struct list_head subdevs;
+  spinlock_t lock;
+  char name[V4L2_DEVICE_NAME_SIZE];
+  void(*notify)(struct v4l2_subdev *sd, unsigned int notification, void *arg);
+  struct v4l2_ctrl_handler *ctrl_hander;
+  struct v4l2_prio_state prio;
+  struct kref ref;
+  void (*release)(struct v4l2_device *v4l2_dev);
+};
+
+struct v4l2_file_operations{
+struct module * owner;
+  ssize_t (*read)(struct file*, char __user*, size_t loff_t*);
+  ssize_t (*write)(struct file*, const char __user*, size_t, loff_t*);
+  unsigned int (*poll)(struct file *, struct poll_table_struct *);
+  long (*unlocked_ioctl)(struct file *, unsigned int, unsigned long);
+#ifdef CONFIG_COMPAT
+  long (*compat_ioctl32)(struct file *, unsigned int, unsigned long);
+#endif
+  unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+  int (*mmap)(struct file*, struct vm_area_struct*);
+  int (*open)(struct file*);
+  int (*release)(struct file*);
+};
+Members
+
+owner
+    pointer to struct module.
+    
+read
+    operations needed to implement the read() syscall.
+    
+write
+    operations needed to implement the write() syscall.
+    
+poll
+    operations needed to implement the poll() syscall.
+    
+unlocked_ioctl
+    operations needed to implement the ioctl() syscall.
+
+compat_ioctl32
+    operations needed to implement the ioctl() syscall for special case where the Kernel uses 64 bits instructions, but the userspace uses 32bits.
+
+get_unmaped_area
+    called by the mmap() syscall, used when %!CONFIGMMU
+    
+mmap 
+    operations needed to implement the mmap() syscall
+
+open
+    operations needed to implement the open() syscall
+   
+release
+    operations needed to implement the release() syscall
+ 
+The V4L2 core overrides the fs ops with some extra logic needed by the subsystem.
+
+
+struct video_device used to create and manage the V4L2 device nodes.
+struct video_device{
+#if defined(CONFIG_MEDIA_CONTROLLER)
+  struct media_entity entity;
+  struct media_intf_devnode *intf_devnode'
+  struct media_pipeline pipe;
+#endif
+  const struct v4l2_file_operations *fops;
+  u32 device_caps;
+  struct device dev;
+  struct cdev *cdev;
+  struct v4l2_device *v4l2_dev;
+  struct device *dev_parent;
+  struct v4l2_ctrl_handler *ctrl_handler;
+  struct vb2_queue *queue;
+  struct v4l2_prio_state *prio;
+  char name[32];
+  int vfl_type;
+  int vfl_dir;
+  int minor;
+  u16 num;
+  unsigned long flags;
+  int index;
+  spinlock_t fh_lock;
+  struct list_head fh_list;
+  int dev_debug;
+  v4l2_std_id tvnorms;
+  void (*release)(struct video_device *vdev);
+  const struct v4l2_ioctl_ops *ioctl_ops;
+  unsigned long valid_ioctls[BITS_NO_LONGS(BASE_VIDEOC_PRIVATE)];
+  unsigned long disable_locking[BITS_TO_LONGS(BASE_VIDEOC_PRIVATE)];
+  struct mutex *lock;
+};
+
