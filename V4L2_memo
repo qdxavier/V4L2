@@ -24,6 +24,7 @@ struct v4l2_device{
   struct kref ref;
   void (*release)(struct v4l2_device *v4l2_dev);
 };
+v4l2_device_register(dev, v4l2_dev), the first dev argument is normally the struct device pointer of pci_dev, usb_dev,i2c_dev or platform_dev.
 
 struct v4l2_file_operations{
 struct module * owner;
@@ -107,4 +108,123 @@ struct video_device{
   unsigned long disable_locking[BITS_TO_LONGS(BASE_VIDEOC_PRIVATE)];
   struct mutex *lock;
 };
+
+V4L2 FIle handlers
+struct v4l2_fh{
+  struct list_head list;
+  struct video_device *vdev;
+  struct v4l2_ctrl_handler *ctrl_handler;
+  enum v4l2_priority prio;
+  wait_queue_head_t wait;
+  struct list_head subscribed;
+  struct list head available;
+  unsigned int navailable;
+  u32 sequence;
+#if IS_ENABLED(CONFIG_V4L2_MEM2MEM_DEV)
+  struct v4l2_m2m_ctx *m2m_ctx;
+#endif
+};
+Members
+list
+  list of file handlers
+  
+vdev
+  pointer to struct video_device
+  
+ctrl_handler
+  pointer to struct v4l2_ctrl_hander
+  
+prio
+   priority of the file handler, as defined by enum v4l2_priority
+   
+wait
+  event's wait queue
+  
+subscribed
+  list of subscribed events
+  
+available
+  list of events waiting to be dequeued
+  
+navailable
+  number of available events at available list
+  
+sequence
+  event sequence number
+  
+m2m_ctx
+  pointer to struct v4l2_m2m_ctx
+  
+The basic functions are v4l2_fh_init(fh, vdev); v4l2_fh_add(fh); v4l2_fh_del(fh); v4l2_fh_exit(fh); v4l2_fh_open(struct file *filp); v4l2_fh_release(struct file *filp);
+
+
+V4L2 Sub-devices
+struct v4l2_subdev_core_ops{
+    int (*log_status)(struct v4l2_subdev *sd);
+    int (*init)(struct v4l2_subdev *sd, u32 val);
+};
+
+struct v4l2_subdev_tuner_ops{
+    ...
+};
+
+struct v4l2_subdev_audio_ops{
+    ...
+};
+
+struct v4l2_subdev_video_ops{
+    ...
+};
+
+struct v4l2_subdev_pad_ops{
+    ...
+};
+
+struct v4l2_subdev_ops{
+    const struct v4l2_subdev_core_ops *core;
+    const struct v4l2_subdev_tuner_ops *tuner;
+    const struct v4l2_subdev_audio_ops  *audio;
+    const struct v4l2_subdev_video_ops  *video;
+    const struct v4l2_subdev_pad_ops  *pad;
+};
+
+struct v4l2_subdev{
+#if defined(CONFIG_MEDIA_CONTROLLER)
+  struct media_entity entity;
+#endif
+  struct list_head list;
+  struct module *owner;
+  bool owner_v4l2_dev;
+  u32 flags;
+  struct v4l2_device *v4l2_dev;
+  const struct v4l2_subdev_ops *ops;
+  const struct v4l2_subdev_internal_ops *internal_ops;
+  struct v4l2_ctrl_hander *ctrl_hander;
+  char name[V4L2_SUBDEV_NAME_SIZE];
+  u32 grp_id;
+  void *dev_priv;
+  void *host_priv;
+  struct video_device *devnode;
+  struct device *dev;
+  struct device_node *of_node;
+  struct list_head async_list;
+  struct v4l2_async_subdev *asd;
+  struct v4l2_aysnc_notifier *notifier;
+  struct v4l2_subdev_platform_data *pdata;
+};
+
+The v4l2_subdev is initialized by v4l2_subdev_init(sd, &ops) function.
+There are two methods for registering the sub device, one is synchronous mode, the other is async.
+The initialization function is v4l2_device_register_subdev(v4l2_dev, sd);
+The sub-device needs to notify its v4l2_device parent of an event by using v4l2_subdev_notify(sd, notification, arg);
+A driver may contain several sub-devices that use an I2C bus, but also a subdev that is controlled through GPIO pins.
+We have two methods for controlling sub-device, one is syscall for v4l2_subdev_ops, the other is controlled by userspace directly.
+we can create device nodes named v4l2-subdevX for sub-devices in /dev to access directly.
+
+
+V4L2 events 
+The driver must use v4l2_fh to be able to support V4L2 events.
+
+
+
 
